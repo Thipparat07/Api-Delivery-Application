@@ -57,10 +57,10 @@ app.get('/api/users/:userID', async (req, res) => {
 // POST /api/users/login
 app.post('/api/users/login', async (req, res) => {
   try {
-    const { phoneNumber, password } = req.body;
+    const { email, password } = req.body;
     
     // ค้นหาผู้ใช้จากหมายเลขโทรศัพท์
-    const userQuery = db.collection('Users').where('phoneNumber', '==', phoneNumber).limit(1);
+    const userQuery = db.collection('Users').where('email', '==', email).limit(1);
     const snapshot = await userQuery.get();
     
     if (snapshot.empty) {
