@@ -100,7 +100,8 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     }
 
     const file = req.file;
-    const fileName = Date.now() + path.extname(file.originalname);
+    // เก็บไฟล์ในโฟลเดอร์ profile
+    const fileName = `profile/${Date.now()}_${path.basename(file.originalname)}`;
     const fileUpload = bucket.file(fileName);
 
     // สร้าง token สำหรับการเข้าถึงไฟล์
@@ -132,3 +133,4 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     res.status(500).send({ message: 'Error uploading file', error: error.message });
   }
 });
+
