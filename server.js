@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 require('dotenv').config();  // โหลดตัวแปรสภาพแวดล้อมจากไฟล์ .env
 
-const { admin, db, bucket } = require('./firebase.config');  // นำเข้า Firebase config
+const { admin, db, bucket } = require('config\fitebasc.config.js');  // นำเข้า Firebase config
 
 const app = express();
 app.use(bodyParser.json());
