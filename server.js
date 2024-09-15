@@ -4,7 +4,7 @@ const admin = require('firebase-admin');
 const bodyParser = require('body-parser');
 const path = require('path');
 const multer = require('multer');
-require('dotenv').config();  // เพิ่มบรรทัดนี้
+require('dotenv').config();  // โหลดตัวแปรสภาพแวดล้อมจาก .env
 
 // โหลด Service Account ที่ได้จาก Firebase Console
 const serviceAccount = require(process.env.GOOGLE_APPLICATION_CREDENTIALS);
@@ -14,6 +14,7 @@ admin.initializeApp({
   storageBucket: 'flutter-test-01-e84cf.appspot.com'
 });
 
+const db = admin.firestore(); // นำเข้า Firestore
 const bucket = admin.storage().bucket();
 const app = express();
 app.use(bodyParser.json());
@@ -24,50 +25,46 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
-
-
 // POST /api/users/register
 app.post('/api/users/register', async (req, res) => {
     try {
-      const { phoneNumber, password, fullName, profileImage, address, gpsLocation, role } = req.body;
-      
-      const userRef = db.collection('Users').doc();
-      await userRef.set({
-        phoneNumber,
-        password,
-        fullName,
-        profileImage,
-        address,
-        gpsLocation: new admin.firestore.GeoPoint(gpsLocation.latitude, gpsLocation.longitude),
-        role
-      });
-      
-      res.status(201).send({ message: 'User registered successfully', userId: userRef.id });
+        const { phoneNumber, password, fullName, profileImage, address, gpsLocation, role } = req.body;
+        
+        const userRef = db.collection('Users').doc();
+        await userRef.set({
+            phoneNumber,
+            password,
+            fullName,
+            profileImage,
+            address,
+            gpsLocation: new admin.firestore.GeoPoint(gpsLocation.latitude, gpsLocation.longitude),
+            role
+        });
+        
+        res.status(201).send({ message: 'User registered successfully', userId: userRef.id });
     } catch (error) {
-      res.status(500).send({ message: 'Error registering user', error: error.message });
+        res.status(500).send({ message: 'Error registering user', error: error.message });
     }
-  });
-  
+});
 
-  // GET /api/users/:userID
+// GET /api/users/:userID
 app.get('/api/users/:userID', async (req, res) => {
     try {
-      const userID = req.params.userID;
-      const userRef = db.collection('Users').doc(userID);
-      const doc = await userRef.get();
-      
-      if (!doc.exists) {
-        return res.status(404).send({ message: 'User not found' });
-      }
-  
-      res.status(200).send(doc.data());
-    } catch (error) {
-      res.status(500).send({ message: 'Error retrieving user', error: error.message });
-    }
-  });
-  
+        const userID = req.params.userID;
+        const userRef = db.collection('Users').doc(userID);
+        const doc = await userRef.get();
+        
+        if (!doc.exists) {
+            return res.status(404).send({ message: 'User not found' });
+        }
 
-  // POST /api/users/login
+        res.status(200).send(doc.data());
+    } catch (error) {
+        res.status(500).send({ message: 'Error retrieving user', error: error.message });
+    }
+});
+
+// POST /api/users/login
 app.post('/api/users/login', async (req, res) => {
     try {
         const { phoneNumber, password } = req.body;
@@ -101,11 +98,9 @@ app.post('/api/users/login', async (req, res) => {
     }
 });
 
-
-
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
-const { v4: uuidv4 } = require('uuid')
+const { v4: uuidv4 } = require('uuid');
 
 // POST /api/upload
 app.post('/api/upload', upload.single('file'), async (req, res) => {
