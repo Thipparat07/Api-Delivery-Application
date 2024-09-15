@@ -18,11 +18,11 @@ app.listen(PORT, () => {
 // POST /api/users/register
 app.post('/api/users/register', async (req, res) => {
   try {
-    const { phoneNumber, password, fullName, profileImage, address, gpsLocation, role } = req.body;
+    const { email, password, fullName, profileImage, address, gpsLocation, role } = req.body;
     
     const userRef = db.collection('Users').doc();
     await userRef.set({
-      phoneNumber,
+      email,
       password,
       fullName,
       profileImage,
