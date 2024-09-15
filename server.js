@@ -4,13 +4,14 @@ const admin = require('firebase-admin');
 const bodyParser = require('body-parser');
 const path = require('path');
 const multer = require('multer');
+require('dotenv').config();  // เพิ่มบรรทัดนี้
 
 // โหลด Service Account ที่ได้จาก Firebase Console
-const serviceAccount = require('./flutter-test-01-e84cf-firebase-adminsdk-yt2vo-e4a13909a2.json');
+const serviceAccount = require(process.env.GOOGLE_APPLICATION_CREDENTIALS);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  storageBucket: 'gs://flutter-test-01-e84cf.appspot.com' // เปลี่ยนเป็น Storage Bucket ของคุณ
+  storageBucket: 'flutter-test-01-e84cf.appspot.com'
 });
 
 const bucket = admin.storage().bucket();
