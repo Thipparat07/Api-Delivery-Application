@@ -8,7 +8,7 @@ const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 // Initializing Firebase Admin SDK
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  storageBucket: 'flutter-test-01-e84cf.appspot.com' // เปลี่ยนเป็นชื่อ Firebase Storage Bucket ของคุณ
+  storageBucket: 'flutter-test-b8f95.appspot.com' // เปลี่ยนเป็นชื่อ Firebase Storage Bucket ของคุณ
 });
 
 const db = admin.firestore();
