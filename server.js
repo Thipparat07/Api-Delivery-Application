@@ -4,9 +4,6 @@ const connection = require('./db');
 const multer = require('multer');
 const path = require('path');
 require('dotenv').config();  // โหลดตัวแปรสภาพแวดล้อมจากไฟล์ .env
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
-const { v4: uuidv4 } = require('uuid');
 
 
 const { admin, db, bucket } = require('./config/fitebasc.config');  // นำเข้า Firebase config
@@ -52,8 +49,8 @@ app.post('/login', (req, res) => {
 
 
 // API สำหรับการสมัครสมาชิกของ Users
-app.post('/register/users', upload.single('profilePicture'), async (req, res) => {
-  const { phoneNumber, password, fullName, email, address, gpsLocation } = req.body;
+app.post('/register/users', async (req, res) => {
+  const { phoneNumber, password, fullName, email, profilePicture, address, gpsLocation } = req.body;
 
   // Validate input
   if (!phoneNumber || !password || !fullName) {
@@ -71,54 +68,18 @@ app.post('/register/users', upload.single('profilePicture'), async (req, res) =>
           return res.status(400).json({ message: 'หมายเลขโทรศัพท์นี้มีอยู่แล้วในระบบ' });
       }
 
-      // ประกาศฟังก์ชัน saveUserToDatabase ล่วงหน้า
-      const saveUserToDatabase = () => {
-          const query = 'INSERT INTO Users (PhoneNumber, Password, FullName, Email, ProfilePicture, Address, GPSLocation) VALUES (?, ?, ?, ?, ?, ?, ?)';
-          connection.query(query, [phoneNumber, password, fullName, email, profilePictureUrl, address, gpsLocation], (err, results) => {
-              if (err) {
-                  return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
-              }
-              return res.status(201).json({ message: 'สมัครสมาชิก Users สำเร็จ', userId: results.insertId });
-          });
-      };
+      // Insert the user into the database
+      const query = 'INSERT INTO Users (PhoneNumber, Password, FullName, Email, ProfilePicture, Address, GPSLocation) VALUES (?, ?, ?, ?, ?, ?, ?)';
+      
+      connection.query(query, [phoneNumber, password, fullName, email, profilePicture, address, gpsLocation], (err, results) => {
+          if (err) {
+              return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
+          }
 
-      // ตรวจสอบว่ามีรูปภาพหรือไม่
-      let profilePictureUrl = null;
-      if (req.file) {
-          const file = req.file;
-          const fileName = `profile/${Date.now()}_${path.basename(file.originalname)}`;
-          const fileUpload = bucket.file(fileName);
-          const token = uuidv4();
-
-          const stream = fileUpload.createWriteStream({
-              metadata: {
-                  contentType: file.mimetype,
-                  metadata: {
-                      firebaseStorageDownloadTokens: token
-                  }
-              },
-          });
-
-          // สตรีมไฟล์ไปยัง Firebase Storage
-          stream.on('error', (err) => {
-              return res.status(500).send({ message: 'Error uploading file', error: err.message });
-          });
-
-          stream.on('finish', async () => {
-              profilePictureUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
-              // หลังจากอัปโหลดเสร็จ ให้ทำการบันทึกข้อมูลผู้ใช้ลงในฐานข้อมูล
-              saveUserToDatabase();
-          });
-
-          stream.end(file.buffer);
-      } else {
-          // ไม่มีรูปภาพ ให้บันทึกข้อมูลผู้ใช้โดยไม่รวม profilePicture
-          saveUserToDatabase();
-      }
+          return res.status(201).json({ message: 'สมัครสมาชิก Users สำเร็จ', userId: results.insertId });
+      });
   });
 });
-
-
 
 
 // API สำหรับการสมัครสมาชิกของ Riders
@@ -155,7 +116,9 @@ app.post('/register/riders', async (req, res) => {
 });
 
 
-
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+const { v4: uuidv4 } = require('uuid');
 
 // POST /api/upload
 app.post('/api/upload', upload.single('file'), async (req, res) => {
