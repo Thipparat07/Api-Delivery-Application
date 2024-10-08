@@ -16,79 +16,6 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
-// // POST /api/users/register
-// app.post('/api/users/register', async (req, res) => {
-//   try {
-//     const { email, password, fullName, profileImage, address, gpsLocation, role } = req.body;
-    
-//     const userRef = db.collection('Users').doc();
-//     await userRef.set({
-//       email,
-//       password,
-//       fullName,
-//       profileImage,
-//       address,
-//       gpsLocation: new admin.firestore.GeoPoint(gpsLocation.latitude, gpsLocation.longitude),
-//       role
-//     });
-    
-//     res.status(201).send({ message: 'User registered successfully', userId: userRef.id });
-//   } catch (error) {
-//     res.status(500).send({ message: 'Error registering user', error: error.message });
-//   }
-// });
-
-// // GET /api/users/:userID
-// app.get('/api/users/:userID', async (req, res) => {
-//   try {
-//     const userID = req.params.userID;
-//     const userRef = db.collection('Users').doc(userID);
-//     const doc = await userRef.get();
-    
-//     if (!doc.exists) {
-//       return res.status(404).send({ message: 'User not found' });
-//     }
-
-//     res.status(200).send(doc.data());
-//   } catch (error) {
-//     res.status(500).send({ message: 'Error retrieving user', error: error.message });
-//   }
-// });
-
-// // POST /api/users/login
-// app.post('/api/users/login', async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
-    
-//     // ค้นหาผู้ใช้จากหมายเลขโทรศัพท์
-//     const userQuery = db.collection('Users').where('email', '==', email).limit(1);
-//     const snapshot = await userQuery.get();
-    
-//     if (snapshot.empty) {
-//       return res.status(404).send({ message: 'User not found' });
-//     }
-
-//     // รับข้อมูลผู้ใช้จากผลลัพธ์
-//     const userDoc = snapshot.docs[0];
-//     const userData = userDoc.data();
-
-//     // ตรวจสอบรหัสผ่าน (คุณอาจต้องใช้การตรวจสอบรหัสผ่านที่ปลอดภัยกว่าในระบบจริง)
-//     if (userData.password !== password) {
-//       return res.status(401).send({ message: 'Invalid password' });
-//     }
-
-//     // ตอบกลับด้วยข้อมูลผู้ใช้เมื่อเข้าสู่ระบบสำเร็จ
-//     res.status(200).send({
-//       message: 'Login successful',
-//       userId: userDoc.id,
-//       fullName: userData.fullName,
-//       role: userData.role
-//     });
-//   } catch (error) {
-//     res.status(500).send({ message: 'Error logging in', error: error.message });
-//   }
-// });
-
 // API สำหรับการเข้าสู่ระบบ
 app.post('/login', (req, res) => {
   const { phoneNumber, password } = req.body; // เปลี่ยนจาก username เป็น phoneNumber
@@ -122,25 +49,37 @@ app.post('/login', (req, res) => {
 
 // API สำหรับการสมัครสมาชิกของ Users
 app.post('/register/users', async (req, res) => {
-  const { phoneNumber, password, fullName, email, profilePicture, address, gpsLocation} = req.body;
+  const { phoneNumber, password, fullName, email, profilePicture, address, gpsLocation } = req.body;
 
   // Validate input
   if (!phoneNumber || !password || !fullName) {
       return res.status(400).json({ message: 'หมายเลขโทรศัพท์, รหัสผ่าน, ชื่อ' });
   }
 
-
-  // Insert the user into the database
-  const query = 'INSERT INTO Users (PhoneNumber, Password, FullName, Email, ProfilePicture, Address, GPSLocation) VALUES (?, ?, ?, ?, ?, ?, ?)';
-  
-  connection.query(query, [phoneNumber, password, fullName, email, profilePicture, address, gpsLocation], (err, results) => {
+  // ตรวจสอบหมายเลขโทรศัพท์ว่ามีอยู่ในฐานข้อมูลหรือไม่
+  const checkQuery = 'SELECT * FROM Users WHERE PhoneNumber = ?';
+  connection.query(checkQuery, [phoneNumber], (err, results) => {
       if (err) {
           return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
       }
 
-      return res.status(201).json({ message: 'สมัครสมาชิก Users สำเร็จ', userId: results.insertId });
+      if (results.length > 0) {
+          return res.status(400).json({ message: 'หมายเลขโทรศัพท์นี้มีอยู่แล้วในระบบ' });
+      }
+
+      // Insert the user into the database
+      const query = 'INSERT INTO Users (PhoneNumber, Password, FullName, Email, ProfilePicture, Address, GPSLocation) VALUES (?, ?, ?, ?, ?, ?, ?)';
+      
+      connection.query(query, [phoneNumber, password, fullName, email, profilePicture, address, gpsLocation], (err, results) => {
+          if (err) {
+              return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
+          }
+
+          return res.status(201).json({ message: 'สมัครสมาชิก Users สำเร็จ', userId: results.insertId });
+      });
   });
 });
+
 
 // API สำหรับการสมัครสมาชิกของ Riders
 app.post('/register/riders', async (req, res) => {
@@ -151,17 +90,30 @@ app.post('/register/riders', async (req, res) => {
       return res.status(400).json({ message: 'ชื่อ, อีเมล, หมายเลขโทรศัพท์, รหัสผ่าน, และหมายเลขทะเบียนรถจำเป็นต้องระบุ' });
   }
 
-  // Insert the rider into the database
-  const query = 'INSERT INTO Riders (FullName, Email, PhoneNumber, Password, ProfilePicture, VehicleRegistration) VALUES (?, ?, ?, ?, ?, ?)';
-  
-  connection.query(query, [fullName, email, phoneNumber, password, profilePicture, vehicleRegistration], (err, results) => {
+  // ตรวจสอบหมายเลขโทรศัพท์ว่ามีอยู่ในฐานข้อมูลหรือไม่
+  const checkQuery = 'SELECT * FROM Riders WHERE PhoneNumber = ?';
+  connection.query(checkQuery, [phoneNumber], (err, results) => {
       if (err) {
           return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
       }
 
-      return res.status(201).json({ message: 'สมัครสมาชิก Riders สำเร็จ', riderId: results.insertId });
+      if (results.length > 0) {
+          return res.status(400).json({ message: 'หมายเลขโทรศัพท์นี้มีอยู่แล้วในระบบ' });
+      }
+
+      // Insert the rider into the database
+      const query = 'INSERT INTO Riders (FullName, Email, PhoneNumber, Password, ProfilePicture, VehicleRegistration) VALUES (?, ?, ?, ?, ?, ?)';
+      
+      connection.query(query, [fullName, email, phoneNumber, password, profilePicture, vehicleRegistration], (err, results) => {
+          if (err) {
+              return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
+          }
+
+          return res.status(201).json({ message: 'สมัครสมาชิก Riders สำเร็จ', riderId: results.insertId });
+      });
   });
 });
+
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
