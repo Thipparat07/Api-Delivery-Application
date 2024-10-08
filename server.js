@@ -71,6 +71,17 @@ app.post('/register/users', upload.single('profilePicture'), async (req, res) =>
           return res.status(400).json({ message: 'หมายเลขโทรศัพท์นี้มีอยู่แล้วในระบบ' });
       }
 
+      // ประกาศฟังก์ชัน saveUserToDatabase ล่วงหน้า
+      const saveUserToDatabase = () => {
+          const query = 'INSERT INTO Users (PhoneNumber, Password, FullName, Email, ProfilePicture, Address, GPSLocation) VALUES (?, ?, ?, ?, ?, ?, ?)';
+          connection.query(query, [phoneNumber, password, fullName, email, profilePictureUrl, address, gpsLocation], (err, results) => {
+              if (err) {
+                  return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
+              }
+              return res.status(201).json({ message: 'สมัครสมาชิก Users สำเร็จ', userId: results.insertId });
+          });
+      };
+
       // ตรวจสอบว่ามีรูปภาพหรือไม่
       let profilePictureUrl = null;
       if (req.file) {
@@ -104,18 +115,9 @@ app.post('/register/users', upload.single('profilePicture'), async (req, res) =>
           // ไม่มีรูปภาพ ให้บันทึกข้อมูลผู้ใช้โดยไม่รวม profilePicture
           saveUserToDatabase();
       }
-
-      const saveUserToDatabase = () => {
-          const query = 'INSERT INTO Users (PhoneNumber, Password, FullName, Email, ProfilePicture, Address, GPSLocation) VALUES (?, ?, ?, ?, ?, ?, ?)';
-          connection.query(query, [phoneNumber, password, fullName, email, profilePictureUrl, address, gpsLocation], (err, results) => {
-              if (err) {
-                  return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
-              }
-              return res.status(201).json({ message: 'สมัครสมาชิก Users สำเร็จ', userId: results.insertId });
-          });
-      };
   });
 });
+
 
 
 
