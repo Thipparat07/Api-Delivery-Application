@@ -47,6 +47,8 @@ app.post('/login', (req, res) => {
   });
 });
 
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 app.post('/register/users', upload.single('profilePicture'), async (req, res) => {
   const { phoneNumber, password, fullName, email, address, gpsLocation } = req.body;
@@ -141,49 +143,49 @@ app.post('/register/riders', async (req, res) => {
 });
 
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
-const { v4: uuidv4 } = require('uuid');
+// const storage = multer.memoryStorage();
+// const upload = multer({ storage: storage });
+// const { v4: uuidv4 } = require('uuid');
 
-// POST /api/upload
-app.post('/api/upload', upload.single('file'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).send({ message: 'No file uploaded' });
-    }
+// // POST /api/upload
+// app.post('/api/upload', upload.single('file'), async (req, res) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).send({ message: 'No file uploaded' });
+//     }
 
-    const file = req.file;
-    // เก็บไฟล์ในโฟลเดอร์ profile
-    const fileName = `profile/${Date.now()}_${path.basename(file.originalname)}`;
-    const fileUpload = bucket.file(fileName);
+//     const file = req.file;
+//     // เก็บไฟล์ในโฟลเดอร์ profile
+//     const fileName = `profile/${Date.now()}_${path.basename(file.originalname)}`;
+//     const fileUpload = bucket.file(fileName);
 
-    // สร้าง token สำหรับการเข้าถึงไฟล์
-    const token = uuidv4();
+//     // สร้าง token สำหรับการเข้าถึงไฟล์
+//     const token = uuidv4();
 
-    // สตรีมไฟล์ไปยัง Firebase Storage พร้อมเพิ่ม token ใน metadata
-    const stream = fileUpload.createWriteStream({
-      metadata: {
-        contentType: file.mimetype,
-        metadata: {
-          firebaseStorageDownloadTokens: token // ใส่ token ลงใน metadata
-        }
-      },
-    });
+//     // สตรีมไฟล์ไปยัง Firebase Storage พร้อมเพิ่ม token ใน metadata
+//     const stream = fileUpload.createWriteStream({
+//       metadata: {
+//         contentType: file.mimetype,
+//         metadata: {
+//           firebaseStorageDownloadTokens: token // ใส่ token ลงใน metadata
+//         }
+//       },
+//     });
 
-    stream.on('error', (err) => {
-      res.status(500).send({ message: 'Error uploading file', error: err.message });
-    });
+//     stream.on('error', (err) => {
+//       res.status(500).send({ message: 'Error uploading file', error: err.message });
+//     });
 
-    stream.on('finish', async () => {
-      // สร้าง Firebase Storage URL พร้อม token
-      const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
+//     stream.on('finish', async () => {
+//       // สร้าง Firebase Storage URL พร้อม token
+//       const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
       
-      res.status(200).send({ message: 'File uploaded successfully', fileUrl: publicUrl });
-    });
+//       res.status(200).send({ message: 'File uploaded successfully', fileUrl: publicUrl });
+//     });
 
-    stream.end(file.buffer);
-  } catch (error) {
-    res.status(500).send({ message: 'Error uploading file', error: error.message });
-  }
-});
+//     stream.end(file.buffer);
+//   } catch (error) {
+//     res.status(500).send({ message: 'Error uploading file', error: error.message });
+//   }
+// });
 
