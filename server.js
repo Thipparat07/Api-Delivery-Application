@@ -6,7 +6,6 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid'); // นำเข้าฟังก์ชัน uuidv4
 require('dotenv').config();  // โหลดตัวแปรสภาพแวดล้อมจากไฟล์ .env
 
-
 const { admin, db, bucket } = require('./config/fitebasc.config');  // นำเข้า Firebase config
 
 const app = express();
@@ -18,9 +17,13 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
+app.get('/', (req, res) => {
+  res.send('Online Api-Delivery-Application');
+});
+
 // API สำหรับการเข้าสู่ระบบ
 app.post('/login', (req, res) => {
-  const { phoneNumber, password } = req.body; // เปลี่ยนจาก username เป็น phoneNumber
+  const { phoneNumber, password } = req.body;
 
   if (!phoneNumber || !password) {
     return res.status(400).json({ message: 'หมายเลขโทรศัพท์และรหัสผ่านจำเป็นต้องระบุ' });
