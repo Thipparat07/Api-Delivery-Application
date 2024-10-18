@@ -22,155 +22,210 @@ app.get('/', (req, res) => {
 });
 
 // API สำหรับการเข้าสู่ระบบ
-app.post('/login', (req, res) => {
-  const { phoneNumber, password } = req.body;
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
 
-  if (!phoneNumber || !password) {
-    return res.status(400).json({ message: 'หมายเลขโทรศัพท์และรหัสผ่านจำเป็นต้องระบุ' });
+  if (!email || !password) {
+    return res.status(400).json({ message: 'อีเมลและรหัสผ่านจำเป็นต้องระบุ' });
   }
 
-  // อัปเดตคำสั่ง SQL เพื่อตรวจสอบจากหมายเลขโทรศัพท์
-  const query = 'SELECT * FROM Users WHERE PhoneNumber = ? AND Password = ?';
-  
-  connection.query(query, [phoneNumber, password], (err, results) => {
+  // คำสั่ง SQL เพื่อตรวจสอบจากอีเมล
+  const query = 'SELECT * FROM Users WHERE Email = ?';
+
+  connection.query(query, [email], async (err, results) => {
     if (err) {
-      return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
+      console.error('Database error:', err.message);
+      return res.status(500).json({ 
+        message: 'ข้อผิดพลาดจากฐานข้อมูล' 
+      });
     }
 
     if (results.length > 0) {
-      // เข้าสู่ระบบสำเร็จ
-      return res.status(200).json({
-        message: 'เข้าสู่ระบบสำเร็จ',
-        userId: results[0].UserID,  // สมมติว่าตาราง Users ของคุณมีคอลัมน์ UserID
-        fullName: results[0].FullName, // คุณสามารถคืนค่า FullName หรือรายละเอียดผู้ใช้อื่น ๆ ได้หากต้องการ
-      });
+      const user = results[0];
+
+      if (password === user.Password) {
+        // เข้าสู่ระบบสำเร็จ
+        return res.status(200).json({
+          message: 'เข้าสู่ระบบสำเร็จ',
+          userId: user.UserID,
+          Name: user.Name,
+          userType: user.UserType,
+        });
+      } else {
+        // รหัสผ่านไม่ถูกต้อง
+        return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
+      }
     } else {
-      // เข้าสู่ระบบล้มเหลว
-      return res.status(401).json({ message: 'หมายเลขโทรศัพท์หรือรหัสผ่านไม่ถูกต้อง' });
+      // อีเมลไม่พบในระบบ
+      return res.status(401).json({ message: 'อีเมลไม่ถูกต้อง' });
     }
   });
 });
+
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 // API สำหรับการสมัครสมาชิกของ Users
 app.post('/register/users', upload.single('profilePicture'), async (req, res) => {
-  const { phoneNumber, password, fullName, email, address, gpsLocation } = req.body;
+  const { phoneNumber, password, Name, email, address, gpsLocation } = req.body;
 
   // Validate input
-  if (!phoneNumber || !password || !fullName) {
-    return res.status(400).json({ message: 'หมายเลขโทรศัพท์, รหัสผ่าน, และชื่อจำเป็นต้องระบุ' });
+  if (!phoneNumber || !password || !Name || !email) {
+    return res.status(400).json({ message: 'หมายเลขโทรศัพท์, รหัสผ่าน, ชื่อ, และอีเมลจำเป็นต้องระบุ' });
   }
 
   // ตรวจสอบหมายเลขโทรศัพท์ว่ามีอยู่ในฐานข้อมูลหรือไม่
-  const checkQuery = 'SELECT * FROM Users WHERE PhoneNumber = ?';
-  connection.query(checkQuery, [phoneNumber], async (err, results) => {
+  const phoneCheckQuery = 'SELECT * FROM Users WHERE PhoneNumber = ?';
+  const emailCheckQuery = 'SELECT * FROM Users WHERE Email = ?';
+
+  // Check phone number
+  connection.query(phoneCheckQuery, [phoneNumber], async (err, phoneResults) => {
     if (err) {
-      return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
+      return res.status(500).json({ 
+        message: 'ข้อผิดพลาดจากฐานข้อมูล', 
+        error: err.message
+      });
     }
 
-    if (results.length > 0) {
+    if (phoneResults.length > 0) {
       return res.status(400).json({ message: 'หมายเลขโทรศัพท์นี้มีอยู่แล้วในระบบ' });
     }
 
-    let profilePictureUrl = null;
-
-    // ถ้ามีการส่งรูปภาพโปรไฟล์เข้ามา ให้อัปโหลดรูปไปยัง Firebase
-    if (req.file) {
-      const file = req.file;
-      const fileName = `profile/${Date.now()}_${path.basename(file.originalname)}`;
-      const fileUpload = bucket.file(fileName);
-      const token = uuidv4();
-
-      const stream = fileUpload.createWriteStream({
-        metadata: {
-          contentType: file.mimetype,
-          metadata: {
-            firebaseStorageDownloadTokens: token,
-          },
-        },
-      });
-
-      await new Promise((resolve, reject) => {
-        stream.on('error', reject);
-        stream.on('finish', () => resolve());
-        stream.end(file.buffer);
-      });
-
-      profilePictureUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
-    }
-
-    // Insert the user into the database พร้อมลิงก์รูป
-    const query = 'INSERT INTO Users (PhoneNumber, Password, FullName, Email, ProfilePicture, Address, GPSLocation) VALUES (?, ?, ?, ?, ?, ?, ?)';
-    connection.query(query, [phoneNumber, password, fullName, email, profilePictureUrl, address, gpsLocation], (err, results) => {
+    // Check email
+    connection.query(emailCheckQuery, [email], async (err, emailResults) => {
       if (err) {
-        return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
+        return res.status(500).json({ 
+          message: 'ข้อผิดพลาดจากฐานข้อมูล', 
+          error: err.message
+        });
       }
 
-      return res.status(201).json({ message: 'สมัครสมาชิก Users สำเร็จ', userId: results.insertId });
+      if (emailResults.length > 0) {
+        return res.status(400).json({ message: 'อีเมลนี้มีอยู่แล้วในระบบ' });
+      }
+
+      let profilePictureUrl = null;
+
+      // ถ้ามีการส่งรูปภาพโปรไฟล์เข้ามา ให้อัปโหลดรูปไปยัง Firebase
+      if (req.file) {
+        const file = req.file;
+        const fileName = `profile/${Date.now()}_${path.basename(file.originalname)}`;
+        const fileUpload = bucket.file(fileName);
+        const token = uuidv4();
+
+        const stream = fileUpload.createWriteStream({
+          metadata: {
+            contentType: file.mimetype,
+            metadata: {
+              firebaseStorageDownloadTokens: token,
+            },
+          },
+        });
+
+        await new Promise((resolve, reject) => {
+          stream.on('error', reject);
+          stream.on('finish', () => resolve());
+          stream.end(file.buffer);
+        });
+
+        profilePictureUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
+      }
+
+      // Insert the user into the database พร้อมลิงก์รูป
+      const query = 'INSERT INTO Users (PhoneNumber, Password, Name, Email, ProfilePicture, Address, GPSLocation, UserType) VALUES (?, ?, ?, ?, ?, ?, ?, "User")';
+      connection.query(query, [phoneNumber, password, Name, email, profilePictureUrl, address, gpsLocation], (err, results) => {
+        if (err) {
+          return res.status(500).json({ 
+            message: 'ข้อผิดพลาดจากฐานข้อมูล', 
+            error: err.message
+          });
+        }
+
+        return res.status(201).json({ message: 'สมัครสมาชิก Users สำเร็จ', userId: results.insertId });
+      });
     });
   });
 });
 
-
 // API สำหรับการสมัครสมาชิกของ Riders
 app.post('/register/riders', upload.single('profilePicture'), async (req, res) => {
-  const { fullName, email, phoneNumber, password, vehicleRegistration } = req.body;
+  const { Name, email, phoneNumber, password, vehicleRegistration } = req.body;
 
   // Validate input
-  if (!fullName || !email || !phoneNumber || !password || !vehicleRegistration) {
+  if (!Name || !email || !phoneNumber || !password || !vehicleRegistration) {
     return res.status(400).json({ message: 'ชื่อ, อีเมล, หมายเลขโทรศัพท์, รหัสผ่าน, และหมายเลขทะเบียนรถจำเป็นต้องระบุ' });
   }
 
   // ตรวจสอบหมายเลขโทรศัพท์ว่ามีอยู่ในฐานข้อมูลหรือไม่
-  const checkQuery = 'SELECT * FROM Riders WHERE PhoneNumber = ?';
-  connection.query(checkQuery, [phoneNumber], async (err, results) => {
+  const phoneCheckQuery = 'SELECT * FROM Users WHERE PhoneNumber = ?';
+  const emailCheckQuery = 'SELECT * FROM Users WHERE Email = ?';
+
+  // Check phone number
+  connection.query(phoneCheckQuery, [phoneNumber], async (err, phoneResults) => {
     if (err) {
-      return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
+      return res.status(500).json({ 
+        message: 'ข้อผิดพลาดจากฐานข้อมูล', 
+        error: err.message
+      });
     }
 
-    if (results.length > 0) {
+    if (phoneResults.length > 0) {
       return res.status(400).json({ message: 'หมายเลขโทรศัพท์นี้มีอยู่แล้วในระบบ' });
     }
 
-    let profilePictureUrl = null;
-
-    // ถ้ามีการส่งรูปภาพโปรไฟล์เข้ามา ให้อัปโหลดรูปไปยัง Firebase
-    if (req.file) {
-      const file = req.file;
-      const fileName = `profile/${Date.now()}_${path.basename(file.originalname)}`;
-      const fileUpload = bucket.file(fileName);
-      const token = uuidv4();
-
-      const stream = fileUpload.createWriteStream({
-        metadata: {
-          contentType: file.mimetype,
-          metadata: {
-            firebaseStorageDownloadTokens: token,
-          },
-        },
-      });
-
-      await new Promise((resolve, reject) => {
-        stream.on('error', reject);
-        stream.on('finish', () => resolve());
-        stream.end(file.buffer);
-      });
-
-      profilePictureUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
-    }
-
-    // Insert the rider into the database พร้อมลิงก์รูป
-    const query = 'INSERT INTO Riders (FullName, Email, PhoneNumber, Password, ProfilePicture, VehicleRegistration) VALUES (?, ?, ?, ?, ?, ?)';
-    connection.query(query, [fullName, email, phoneNumber, password, profilePictureUrl, vehicleRegistration], (err, results) => {
+    // Check email
+    connection.query(emailCheckQuery, [email], async (err, emailResults) => {
       if (err) {
-        return res.status(500).json({ message: 'ข้อผิดพลาดจากฐานข้อมูล', error: err });
+        return res.status(500).json({ 
+          message: 'ข้อผิดพลาดจากฐานข้อมูล', 
+          error: err.message
+        });
       }
 
-      return res.status(201).json({ message: 'สมัครสมาชิก Riders สำเร็จ', riderId: results.insertId });
+      if (emailResults.length > 0) {
+        return res.status(400).json({ message: 'อีเมลนี้มีอยู่แล้วในระบบ' });
+      }
+
+      let profilePictureUrl = null;
+
+      // ถ้ามีการส่งรูปภาพโปรไฟล์เข้ามา ให้อัปโหลดรูปไปยัง Firebase
+      if (req.file) {
+        const file = req.file;
+        const fileName = `profile/${Date.now()}_${path.basename(file.originalname)}`;
+        const fileUpload = bucket.file(fileName);
+        const token = uuidv4();
+
+        const stream = fileUpload.createWriteStream({
+          metadata: {
+            contentType: file.mimetype,
+            metadata: {
+              firebaseStorageDownloadTokens: token,
+            },
+          },
+        });
+
+        await new Promise((resolve, reject) => {
+          stream.on('error', reject);
+          stream.on('finish', () => resolve());
+          stream.end(file.buffer);
+        });
+
+        profilePictureUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
+      }
+
+      // Insert the rider into the database พร้อมลิงก์รูป
+      const query = 'INSERT INTO Users (Name, Email, PhoneNumber, Password, ProfilePicture, VehicleRegistration, UserType) VALUES (?, ?, ?, ?, ?, ?, "Rider")';
+      connection.query(query, [Name, email, phoneNumber, password, profilePictureUrl, vehicleRegistration], (err, results) => {
+        if (err) {
+          return res.status(500).json({ 
+            message: 'ข้อผิดพลาดจากฐานข้อมูล', 
+            error: err.message
+          });
+        }
+
+        return res.status(201).json({ message: 'สมัครสมาชิก Riders สำเร็จ', riderId: results.insertId });
+      });
     });
   });
 });
-
-
