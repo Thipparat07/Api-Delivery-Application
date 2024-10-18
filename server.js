@@ -1,6 +1,6 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const connection = require('./db'); 
+const pool = require('./db');
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid'); // นำเข้าฟังก์ชัน uuidv4
@@ -32,7 +32,7 @@ app.post('/login', async (req, res) => {
   // คำสั่ง SQL เพื่อตรวจสอบจากอีเมล
   const query = 'SELECT * FROM Users WHERE Email = ?';
 
-  connection.query(query, [email], async (err, results) => {
+  pool.query(query, [email], async (err, results) => {
     if (err) {
       console.error('Database error:', err.message);
       return res.status(500).json({ 
@@ -80,7 +80,7 @@ app.post('/register/users', upload.single('profilePicture'), async (req, res) =>
   const emailCheckQuery = 'SELECT * FROM Users WHERE Email = ?';
 
   // Check phone number
-  connection.query(phoneCheckQuery, [phoneNumber], async (err, phoneResults) => {
+  pool.query(phoneCheckQuery, [phoneNumber], async (err, phoneResults) => {
     if (err) {
       return res.status(500).json({ 
         message: 'ข้อผิดพลาดจากฐานข้อมูล', 
@@ -93,7 +93,7 @@ app.post('/register/users', upload.single('profilePicture'), async (req, res) =>
     }
 
     // Check email
-    connection.query(emailCheckQuery, [email], async (err, emailResults) => {
+    pool.query(emailCheckQuery, [email], async (err, emailResults) => {
       if (err) {
         return res.status(500).json({ 
           message: 'ข้อผิดพลาดจากฐานข้อมูล', 
@@ -134,7 +134,7 @@ app.post('/register/users', upload.single('profilePicture'), async (req, res) =>
 
       // Insert the user into the database พร้อมลิงก์รูป
       const query = 'INSERT INTO Users (PhoneNumber, Password, Name, Email, ProfilePicture, Address, GPSLocation, UserType) VALUES (?, ?, ?, ?, ?, ?, ?, "User")';
-      connection.query(query, [phoneNumber, password, Name, email, profilePictureUrl, address, gpsLocation], (err, results) => {
+      pool.query(query, [phoneNumber, password, Name, email, profilePictureUrl, address, gpsLocation], (err, results) => {
         if (err) {
           return res.status(500).json({ 
             message: 'ข้อผิดพลาดจากฐานข้อมูล', 
@@ -162,7 +162,7 @@ app.post('/register/riders', upload.single('profilePicture'), async (req, res) =
   const emailCheckQuery = 'SELECT * FROM Users WHERE Email = ?';
 
   // Check phone number
-  connection.query(phoneCheckQuery, [phoneNumber], async (err, phoneResults) => {
+  pool.query(phoneCheckQuery, [phoneNumber], async (err, phoneResults) => {
     if (err) {
       return res.status(500).json({ 
         message: 'ข้อผิดพลาดจากฐานข้อมูล', 
@@ -175,7 +175,7 @@ app.post('/register/riders', upload.single('profilePicture'), async (req, res) =
     }
 
     // Check email
-    connection.query(emailCheckQuery, [email], async (err, emailResults) => {
+    pool.query(emailCheckQuery, [email], async (err, emailResults) => {
       if (err) {
         return res.status(500).json({ 
           message: 'ข้อผิดพลาดจากฐานข้อมูล', 
@@ -216,7 +216,7 @@ app.post('/register/riders', upload.single('profilePicture'), async (req, res) =
 
       // Insert the rider into the database พร้อมลิงก์รูป
       const query = 'INSERT INTO Users (Name, Email, PhoneNumber, Password, ProfilePicture, VehicleRegistration, UserType) VALUES (?, ?, ?, ?, ?, ?, "Rider")';
-      connection.query(query, [Name, email, phoneNumber, password, profilePictureUrl, vehicleRegistration], (err, results) => {
+      pool.query(query, [Name, email, phoneNumber, password, profilePictureUrl, vehicleRegistration], (err, results) => {
         if (err) {
           return res.status(500).json({ 
             message: 'ข้อผิดพลาดจากฐานข้อมูล', 
