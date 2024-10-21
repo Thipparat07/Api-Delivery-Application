@@ -113,35 +113,32 @@ app.post('/register/users', upload.single('profilePicture'), async (req, res) =>
         return res.status(400).json({ message: 'อีเมลนี้มีอยู่แล้วในระบบ' });
       }
 
-      // Check if profile picture is provided
-      if (!req.file) {
-        return res.status(400).json({ message: 'โปรดเลือกภาพโปรไฟล์' });
-      }
-
       let profilePictureUrl = null;
 
       // ถ้ามีการส่งรูปภาพโปรไฟล์เข้ามา ให้อัปโหลดรูปไปยัง Firebase
-      const file = req.file;
-      const fileName = `profile/${Date.now()}_${path.basename(file.originalname)}`;
-      const fileUpload = bucket.file(fileName);
-      const token = uuidv4();
+      if (req.file) {
+        const file = req.file;
+        const fileName = `profile/${Date.now()}_${path.basename(file.originalname)}`;
+        const fileUpload = bucket.file(fileName);
+        const token = uuidv4();
 
-      const stream = fileUpload.createWriteStream({
-        metadata: {
-          contentType: file.mimetype,
+        const stream = fileUpload.createWriteStream({
           metadata: {
-            firebaseStorageDownloadTokens: token,
+            contentType: file.mimetype,
+            metadata: {
+              firebaseStorageDownloadTokens: token,
+            },
           },
-        },
-      });
+        });
 
-      await new Promise((resolve, reject) => {
-        stream.on('error', reject);
-        stream.on('finish', () => resolve());
-        stream.end(file.buffer);
-      });
+        await new Promise((resolve, reject) => {
+          stream.on('error', reject);
+          stream.on('finish', () => resolve());
+          stream.end(file.buffer);
+        });
 
-      profilePictureUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
+        profilePictureUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
+      }
 
       // Insert the user into the database พร้อมลิงก์รูป
       const query = 'INSERT INTO Users (PhoneNumber, Password, Name, Email, ProfilePicture, Address, GPSLocation, UserType) VALUES (?, ?, ?, ?, ?, ?, ?, "User")';
@@ -201,31 +198,29 @@ app.post('/register/riders', upload.single('profilePicture'), async (req, res) =
       let profilePictureUrl = null;
 
       // ถ้ามีการส่งรูปภาพโปรไฟล์เข้ามา ให้อัปโหลดรูปไปยัง Firebase
-      if (!req.file) {
-        return res.status(400).json({ message: 'โปรดอัปโหลดรูปภาพโปรไฟล์' }); // ตรวจสอบว่าไม่มีรูปภาพ
-      }
+      if (req.file) {
+        const file = req.file;
+        const fileName = `profile/${Date.now()}_${path.basename(file.originalname)}`;
+        const fileUpload = bucket.file(fileName);
+        const token = uuidv4();
 
-      const file = req.file;
-      const fileName = `profile/${Date.now()}_${path.basename(file.originalname)}`;
-      const fileUpload = bucket.file(fileName);
-      const token = uuidv4();
-
-      const stream = fileUpload.createWriteStream({
-        metadata: {
-          contentType: file.mimetype,
+        const stream = fileUpload.createWriteStream({
           metadata: {
-            firebaseStorageDownloadTokens: token,
+            contentType: file.mimetype,
+            metadata: {
+              firebaseStorageDownloadTokens: token,
+            },
           },
-        },
-      });
+        });
 
-      await new Promise((resolve, reject) => {
-        stream.on('error', reject);
-        stream.on('finish', () => resolve());
-        stream.end(file.buffer);
-      });
+        await new Promise((resolve, reject) => {
+          stream.on('error', reject);
+          stream.on('finish', () => resolve());
+          stream.end(file.buffer);
+        });
 
-      profilePictureUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
+        profilePictureUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
+      }
 
       // Insert the rider into the database พร้อมลิงก์รูป
       const query = 'INSERT INTO Users (Name, Email, PhoneNumber, Password, ProfilePicture, VehicleRegistration, UserType) VALUES (?, ?, ?, ?, ?, ?, "Rider")';
@@ -242,7 +237,6 @@ app.post('/register/riders', upload.single('profilePicture'), async (req, res) =
     });
   });
 });
-
 
 // API สำหรับการแสดงข้อมูลแค่useridนั้น
 app.get('/users/:userid', async (req, res) => {
