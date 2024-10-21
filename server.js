@@ -21,18 +21,24 @@ app.get('/', (req, res) => {
   res.send('Online Api-Delivery-Application');
 });
 
-// API สำหรับการเข้าสู่ระบบ
+// API สำหรับการเข้าสู่ระบบโดยใช้หมายเลขโทรศัพท์
 app.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { phoneNumber, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ message: 'อีเมลและรหัสผ่านจำเป็นต้องระบุ' });
+  // ตรวจสอบว่ามีการส่งหมายเลขโทรศัพท์และรหัสผ่านมา
+  if (!phoneNumber || !password) {
+    return res.status(400).json({ message: 'หมายเลขโทรศัพท์และรหัสผ่านจำเป็นต้องระบุ' });
   }
 
-  // คำสั่ง SQL เพื่อตรวจสอบจากอีเมล
-  const query = 'SELECT * FROM Users WHERE Email = ?';
+  // ตรวจสอบว่าหมายเลขโทรศัพท์มีความยาว 10 หลัก
+  if (!/^\d{10}$/.test(phoneNumber)) {
+    return res.status(400).json({ message: 'หมายเลขโทรศัพท์ต้องมี 10 หลัก' });
+  }
 
-  pool.query(query, [email], async (err, results) => {
+  // คำสั่ง SQL เพื่อตรวจสอบจากหมายเลขโทรศัพท์
+  const query = 'SELECT * FROM Users WHERE PhoneNumber = ?';
+
+  pool.query(query, [phoneNumber], async (err, results) => {
     if (err) {
       console.error('Database error:', err.message);
       return res.status(500).json({ 
@@ -47,8 +53,8 @@ app.post('/login', async (req, res) => {
         // เข้าสู่ระบบสำเร็จ
         return res.status(200).json({
           message: 'เข้าสู่ระบบสำเร็จ',
-          userId: user.UserID,
-          Name: user.Name,
+          userid: user.UserID,
+          name: user.Name,
           userType: user.UserType,
         });
       } else {
@@ -56,11 +62,13 @@ app.post('/login', async (req, res) => {
         return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
       }
     } else {
-      // อีเมลไม่พบในระบบ
-      return res.status(401).json({ message: 'อีเมลไม่ถูกต้อง' });
+      // หมายเลขโทรศัพท์ไม่พบในระบบ
+      return res.status(401).json({ message: 'หมายเลขโทรศัพท์ไม่ถูกต้อง' });
     }
   });
 });
+
+
 
 
 const storage = multer.memoryStorage();
@@ -227,5 +235,32 @@ app.post('/register/riders', upload.single('profilePicture'), async (req, res) =
         return res.status(201).json({ message: 'สมัครสมาชิก Riders สำเร็จ', riderId: results.insertId });
       });
     });
+  });
+});
+
+// API สำหรับการแสดงข้อมูลแค่useridนั้น
+app.get('/users/:userid', async (req, res) => {
+  const { userid } = req.params;  // ดึง userid จาก URL parameter
+
+  const query = 'SELECT * FROM Users WHERE UserID = ?';
+
+  pool.query(query, [userid], (err, results) => {
+    if (err) {
+      console.error('Database error:', err.message);
+      return res.status(500).json({ 
+        message: 'ข้อผิดพลาดจากฐานข้อมูล' 
+      });
+    }
+
+    if (results.length > 0) {
+      const user = results[0];
+
+      return res.status(200).json({
+        user: user  // แก้ไขเป็น user แทน user.data เพื่อให้ส่งข้อมูลของผู้ใช้ทั้งหมด
+      });
+
+    } else {
+      return res.status(404).json({ message: 'ไม่พบผู้ใช้ในระบบ' }); // เปลี่ยนสถานะเป็น 404 สำหรับไม่พบผู้ใช้
+    }
   });
 });
