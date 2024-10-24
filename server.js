@@ -383,16 +383,20 @@ app.post('/createOrder', (req, res) => {
 
     // เพิ่มข้อมูล products ลงในตาราง list
     const listQuery = `INSERT INTO list (ProductsID, Amount, OrdersID) VALUES ?`;
-    const listValues = products.map((product) => [product.ProductsID, 0, OrderID]);
-
+    const listValues = products.map((product) => [product, 0, OrderID]);
+    
+    // ตรวจสอบข้อมูลที่ถูกส่งไปยังฐานข้อมูล
+    console.log(listValues);
+    
     pool.query(listQuery, [listValues], (err) => {
       if (err) {
         console.error(err);
         return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการเพิ่มข้อมูล list' });
       }
-
+    
       res.status(200).json({ message: 'เพิ่มข้อมูลสำเร็จ', OrderID });
     });
+    
   });
 });
 
