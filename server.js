@@ -360,54 +360,92 @@ app.get('/api/receivers', (req, res) => {
 });
 
 //-----------------------------------------------------------------------------------------------------------------
+// API สำหรับเพิ่มข้อมูลในตาราง orders และ list
+app.post('/createOrder', (req, res) => {
+  const { Sender_ID, Recipient_ID, products } = req.body;
+  console.error(Sender_ID, Recipient_ID, Recipient_Phone, products);
+  // ตรวจสอบว่ามีข้อมูลที่จำเป็นหรือไม่
+  if (!Sender_ID || !Recipient_ID  || !products || products.length === 0) {
+    return res.status(400).json({ message: 'กรุณาระบุข้อมูลให้ครบถ้วน' });
+  }
+
+  // สร้างคำสั่ง SQL เพื่อเก็บข้อมูลในตาราง orders
+  const orderQuery = `INSERT INTO orders (Sender_ID, Recipient_ID, Recipient_Phone, Status) VALUES (?, ?, ?, 1)`;
+  const orderValues = [Sender_ID, Recipient_ID, Recipient_Phone];
+
+  pool.query(orderQuery, orderValues, (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการเพิ่มข้อมูล orders' });
+    }
+
+    const OrderID = result.insertId; // รับ OrderID ที่ถูกเพิ่มเข้าไป
+
+    // เพิ่มข้อมูล products ลงในตาราง list
+    const listQuery = `INSERT INTO list (ProductsID, Amount, OrdersID) VALUES ?`;
+    const listValues = products.map((product) => [product.ProductsID, 0, OrderID]);
+
+    pool.query(listQuery, [listValues], (err) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการเพิ่มข้อมูล list' });
+      }
+
+      res.status(200).json({ message: 'เพิ่มข้อมูลสำเร็จ', OrderID });
+    });
+  });
+});
+
+
+
 // API สำหรับสร้างออเดอร์
-app.post('/api/orders', (req, res) => {
-  const { Sender_ID, Recipient_ID, Recipient_Phone, Status } = req.body;
+// app.post('/api/orders', (req, res) => {
+//   const { Sender_ID, Recipient_ID, Recipient_Phone, Status } = req.body;
 
-  // ตรวจสอบข้อมูลที่ได้รับ
-  if (!Sender_ID || !Recipient_ID || !Recipient_Phone || !Status) {
-      return res.status(400).json({ message: 'All fields are required' });
-  }
+//   // ตรวจสอบข้อมูลที่ได้รับ
+//   if (!Sender_ID || !Recipient_ID || !Recipient_Phone || !Status) {
+//       return res.status(400).json({ message: 'All fields are required' });
+//   }
 
-  const query = 'INSERT INTO orders (Sender_ID, Recipient_ID, Recipient_Phone, Status) VALUES (?, ?, ?, 1)';
-  pool.query(query, [Sender_ID, Recipient_ID, Recipient_Phone, Status], (err, results) => {
-      if (err) {
-          console.error('Error creating order:', err);
-          return res.status(500).json({ message: 'Internal server error' });
-      }
-      res.status(201).json({ message: 'Order created successfully', orderId: results.insertId });
-  });
-});
+//   const query = 'INSERT INTO orders (Sender_ID, Recipient_ID, Recipient_Phone, Status) VALUES (?, ?, ?, 1)';
+//   pool.query(query, [Sender_ID, Recipient_ID, Recipient_Phone, Status], (err, results) => {
+//       if (err) {
+//           console.error('Error creating order:', err);
+//           return res.status(500).json({ message: 'Internal server error' });
+//       }
+//       res.status(201).json({ message: 'Order created successfully', orderId: results.insertId });
+//   });
+// });
 
-// API สำหรับเพิ่มรายการสินค้าในออเดอร์
-app.post('/api/list', (req, res) => {
-  const { ProductsID, Amount, OrdersID } = req.body;
+// // API สำหรับเพิ่มรายการสินค้าในออเดอร์
+// app.post('/api/list', (req, res) => {
+//   const { ProductsID, Amount, OrdersID } = req.body;
 
-  // ตรวจสอบข้อมูลที่ได้รับ
-  if (!ProductsID || !Amount || !OrdersID) {
-      return res.status(400).json({ message: 'All fields are required' });
-  }
+//   // ตรวจสอบข้อมูลที่ได้รับ
+//   if (!ProductsID || !Amount || !OrdersID) {
+//       return res.status(400).json({ message: 'All fields are required' });
+//   }
 
-  // ตรวจสอบว่ามีออเดอร์นี้อยู่ในฐานข้อมูลหรือไม่
-  const orderCheckQuery = 'SELECT ID FROM orders WHERE ID = ?';
-  pool.query(orderCheckQuery, [OrdersID], (err, results) => {
-      if (err) {
-          console.error('Error checking order:', err);
-          return res.status(500).json({ message: 'Internal server error' });
-      }
+//   // ตรวจสอบว่ามีออเดอร์นี้อยู่ในฐานข้อมูลหรือไม่
+//   const orderCheckQuery = 'SELECT ID FROM orders WHERE ID = ?';
+//   pool.query(orderCheckQuery, [OrdersID], (err, results) => {
+//       if (err) {
+//           console.error('Error checking order:', err);
+//           return res.status(500).json({ message: 'Internal server error' });
+//       }
 
-      if (results.length === 0) {
-          return res.status(404).json({ message: 'Order not found' });
-      }
+//       if (results.length === 0) {
+//           return res.status(404).json({ message: 'Order not found' });
+//       }
 
-      // ถ้ามีออเดอร์นี้อยู่ เพิ่มรายการสินค้า
-      const query = 'INSERT INTO list (ProductsID, Amount, OrdersID) VALUES (?, ?, ?)';
-      pool.query(query, [ProductsID, Amount, OrdersID], (err, results) => {
-          if (err) {
-              console.error('Error inserting list item:', err);
-              return res.status(500).json({ message: 'Internal server error' });
-          }
-          res.status(201).json({ message: 'List item added successfully', listId: results.insertId });
-      });
-  });
-});
+//       // ถ้ามีออเดอร์นี้อยู่ เพิ่มรายการสินค้า
+//       const query = 'INSERT INTO list (ProductsID, Amount, OrdersID) VALUES (?, ?, ?)';
+//       pool.query(query, [ProductsID, Amount, OrdersID], (err, results) => {
+//           if (err) {
+//               console.error('Error inserting list item:', err);
+//               return res.status(500).json({ message: 'Internal server error' });
+//           }
+//           res.status(201).json({ message: 'List item added successfully', listId: results.insertId });
+//       });
+//   });
+// });
