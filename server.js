@@ -36,7 +36,7 @@ app.post('/login', async (req, res) => {
   }
 
   // คำสั่ง SQL เพื่อตรวจสอบจากหมายเลขโทรศัพท์
-  const query = 'SELECT * FROM Users WHERE PhoneNumber = ?';
+  const query = 'SELECT * FROM users WHERE PhoneNumber = ?';
 
   pool.query(query, [phoneNumber], async (err, results) => {
     if (err) {
@@ -84,8 +84,8 @@ app.post('/register/users', upload.single('profilePicture'), async (req, res) =>
   }
 
   // ตรวจสอบหมายเลขโทรศัพท์ว่ามีอยู่ในฐานข้อมูลหรือไม่
-  const phoneCheckQuery = 'SELECT * FROM Users WHERE PhoneNumber = ?';
-  const emailCheckQuery = 'SELECT * FROM Users WHERE Email = ?';
+  const phoneCheckQuery = 'SELECT * FROM users WHERE PhoneNumber = ?';
+  const emailCheckQuery = 'SELECT * FROM users WHERE Email = ?';
 
   // Check phone number
   pool.query(phoneCheckQuery, [phoneNumber], async (err, phoneResults) => {
@@ -141,7 +141,7 @@ app.post('/register/users', upload.single('profilePicture'), async (req, res) =>
       }
 
       // Insert the user into the database พร้อมลิงก์รูป
-      const query = 'INSERT INTO Users (PhoneNumber, Password, Name, Email, ProfilePicture, Address, GPSLocation, UserType) VALUES (?, ?, ?, ?, ?, ?, ?, "User")';
+      const query = 'INSERT INTO users (PhoneNumber, Password, Name, Email, ProfilePicture, Address, GPSLocation, UserType) VALUES (?, ?, ?, ?, ?, ?, ?, "User")';
       pool.query(query, [phoneNumber, password, Name, email, profilePictureUrl, address, gpsLocation], (err, results) => {
         if (err) {
           return res.status(500).json({ 
@@ -166,8 +166,8 @@ app.post('/register/riders', upload.single('profilePicture'), async (req, res) =
   }
 
   // ตรวจสอบหมายเลขโทรศัพท์ว่ามีอยู่ในฐานข้อมูลหรือไม่
-  const phoneCheckQuery = 'SELECT * FROM Users WHERE PhoneNumber = ?';
-  const emailCheckQuery = 'SELECT * FROM Users WHERE Email = ?';
+  const phoneCheckQuery = 'SELECT * FROM users WHERE PhoneNumber = ?';
+  const emailCheckQuery = 'SELECT * FROM users WHERE Email = ?';
 
   // Check phone number
   pool.query(phoneCheckQuery, [phoneNumber], async (err, phoneResults) => {
@@ -223,7 +223,7 @@ app.post('/register/riders', upload.single('profilePicture'), async (req, res) =
       }
 
       // Insert the rider into the database พร้อมลิงก์รูป
-      const query = 'INSERT INTO Users (Name, Email, PhoneNumber, Password, ProfilePicture, VehicleRegistration, UserType) VALUES (?, ?, ?, ?, ?, ?, "Rider")';
+      const query = 'INSERT INTO users (Name, Email, PhoneNumber, Password, ProfilePicture, VehicleRegistration, UserType) VALUES (?, ?, ?, ?, ?, ?, "Rider")';
       pool.query(query, [Name, email, phoneNumber, password, profilePictureUrl, vehicleRegistration], (err, results) => {
         if (err) {
           return res.status(500).json({ 
@@ -237,6 +237,8 @@ app.post('/register/riders', upload.single('profilePicture'), async (req, res) =
     });
   });
 });
+
+
 
 // API สำหรับการแสดงข้อมูลแค่useridนั้น
 app.get('/users/:userid', async (req, res) => {
@@ -262,5 +264,147 @@ app.get('/users/:userid', async (req, res) => {
     } else {
       return res.status(404).json({ message: 'ไม่พบผู้ใช้ในระบบ' }); // เปลี่ยนสถานะเป็น 404 สำหรับไม่พบผู้ใช้
     }
+  });
+});
+
+
+app.post('/add/products', upload.single('image'), async (req, res) => {
+  const { name, description } = req.body;
+
+  // ตรวจสอบค่าที่จำเป็น
+  if (!name || !description) {
+    return res.status(400).json({ message: 'ชื่อและคำอธิบายของผลิตภัณฑ์จำเป็นต้องระบุ' });
+  }
+
+  // อัปโหลดภาพไปยัง Firebase หากมีการส่งภาพ
+  let imageUrl = null;
+
+  if (req.file) {
+    const file = req.file;
+    const fileName = `products/${Date.now()}_${path.basename(file.originalname)}`;
+    const fileUpload = bucket.file(fileName);
+    const token = uuidv4();
+
+    const stream = fileUpload.createWriteStream({
+      metadata: {
+        contentType: file.mimetype,
+        metadata: {
+          firebaseStorageDownloadTokens: token,
+        },
+      },
+    });
+
+    await new Promise((resolve, reject) => {
+      stream.on('error', reject);
+      stream.on('finish', () => resolve());
+      stream.end(file.buffer);
+    });
+
+    imageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media&token=${token}`;
+  }
+
+  // แทรกข้อมูลผลิตภัณฑ์ลงในฐานข้อมูล
+  const query = 'INSERT INTO products (image_url, name, description) VALUES (?, ?, ?)';
+  pool.query(query, [imageUrl, name, description], (err, results) => {
+    if (err) {
+      return res.status(500).json({ 
+        message: 'ข้อผิดพลาดจากฐานข้อมูล', 
+        error: err.message 
+      });
+    }
+
+    // ส่งข้อความตอบกลับ
+    return res.status(201).json({ message: 'เพิ่มผลิตภัณฑ์สำเร็จ' });
+  });
+});
+
+// สร้าง API แสดงรายการสินค้า
+app.get('/api/products', (req, res) => {
+  const query = 'SELECT * FROM products';
+
+  pool.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching products:', err);
+      return res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูลสินค้า' });
+    }
+    
+    // ส่งข้อมูลสินค้าที่ดึงมาในรูปแบบ JSON
+    res.status(200).json(results);
+  });
+});
+
+
+//ค้นหาคนรับสินค้าจากหมายเลขโทรศัพ
+app.get('/api/receivers', (req, res) => {
+  const { phoneNumber } = req.query;
+
+  if (!phoneNumber) {
+    return res.status(400).json({ message: 'Phone number is required' });
+  }
+
+  // Query to find receivers that match the phone number
+  const query = 'SELECT * FROM Users WHERE PhoneNumber LIKE ?';
+  pool.query(query, [`%${phoneNumber}%`], (error, results) => {
+    if (error) {
+      return res.status(500).json({ message: 'Database query failed', error });
+    }
+    
+    if (results.length > 0) {
+      return res.status(200).json(results);
+    } else {
+      return res.status(404).json({ message: 'No receivers found' });
+    }
+  });
+});
+//-----------------------------------------------------------------------------------------------------------------
+// API สำหรับสร้างออเดอร์
+app.post('/api/orders', (req, res) => {
+  const { Sender_ID, Recipient_ID, Recipient_Phone, Status } = req.body;
+
+  // ตรวจสอบข้อมูลที่ได้รับ
+  if (!Sender_ID || !Recipient_ID || !Recipient_Phone || !Status) {
+      return res.status(400).json({ message: 'All fields are required' });
+  }
+
+  const query = 'INSERT INTO orders (Sender_ID, Recipient_ID, Recipient_Phone, Status) VALUES (?, ?, ?, ?)';
+  pool.query(query, [Sender_ID, Recipient_ID, Recipient_Phone, Status], (err, results) => {
+      if (err) {
+          console.error('Error creating order:', err);
+          return res.status(500).json({ message: 'Internal server error' });
+      }
+      res.status(201).json({ message: 'Order created successfully', orderId: results.insertId });
+  });
+});
+
+// API สำหรับเพิ่มรายการสินค้าในออเดอร์
+app.post('/api/list', (req, res) => {
+  const { ProductsID, Amount, OrdersID } = req.body;
+
+  // ตรวจสอบข้อมูลที่ได้รับ
+  if (!ProductsID || !Amount || !OrdersID) {
+      return res.status(400).json({ message: 'All fields are required' });
+  }
+
+  // ตรวจสอบว่ามีออเดอร์นี้อยู่ในฐานข้อมูลหรือไม่
+  const orderCheckQuery = 'SELECT ID FROM orders WHERE ID = ?';
+  pool.query(orderCheckQuery, [OrdersID], (err, results) => {
+      if (err) {
+          console.error('Error checking order:', err);
+          return res.status(500).json({ message: 'Internal server error' });
+      }
+
+      if (results.length === 0) {
+          return res.status(404).json({ message: 'Order not found' });
+      }
+
+      // ถ้ามีออเดอร์นี้อยู่ เพิ่มรายการสินค้า
+      const query = 'INSERT INTO list (ProductsID, Amount, OrdersID) VALUES (?, ?, ?)';
+      pool.query(query, [ProductsID, Amount, OrdersID], (err, results) => {
+          if (err) {
+              console.error('Error inserting list item:', err);
+              return res.status(500).json({ message: 'Internal server error' });
+          }
+          res.status(201).json({ message: 'List item added successfully', listId: results.insertId });
+      });
   });
 });
