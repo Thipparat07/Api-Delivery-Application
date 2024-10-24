@@ -74,7 +74,7 @@ app.post('/login', async (req, res) => {
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// API สำหรับการสมัครสมาชิกของ Users
+// API สำหรับการสมัครสมาชิกของ users
 app.post('/register/users', upload.single('profilePicture'), async (req, res) => {
   const { phoneNumber, password, Name, email, address, gpsLocation } = req.body;
 
@@ -150,7 +150,7 @@ app.post('/register/users', upload.single('profilePicture'), async (req, res) =>
           });
         }
 
-        return res.status(201).json({ message: 'สมัครสมาชิก Users สำเร็จ', userId: results.insertId });
+        return res.status(201).json({ message: 'สมัครสมาชิก users สำเร็จ', userId: results.insertId });
       });
     });
   });
@@ -244,7 +244,7 @@ app.post('/register/riders', upload.single('profilePicture'), async (req, res) =
 app.get('/users/:userid', async (req, res) => {
   const { userid } = req.params;  // ดึง userid จาก URL parameter
 
-  const query = 'SELECT * FROM Users WHERE UserID = ?';
+  const query = 'SELECT * FROM users WHERE UserID = ?';
 
   pool.query(query, [userid], (err, results) => {
     if (err) {
@@ -343,7 +343,7 @@ app.get('/api/receivers', (req, res) => {
   }
 
   // Query to find receivers that match the phone number
-  const query = 'SELECT * FROM Users WHERE PhoneNumber LIKE ?';
+  const query = 'SELECT * FROM users WHERE PhoneNumber LIKE ?';
   pool.query(query, [`%${phoneNumber}%`], (error, results) => {
     if (error) {
       return res.status(500).json({ message: 'Database query failed', error });
