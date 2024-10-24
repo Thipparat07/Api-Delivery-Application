@@ -333,23 +333,26 @@ app.get('/api/products', (req, res) => {
   });
 });
 
-
 // ค้นหาคนรับสินค้าจากหมายเลขโทรศัพ
 app.get('/api/receivers', (req, res) => {
-  const { phoneNumber } = req.query;
+  const { phoneNumber, userID } = req.query; // Get userID from query parameters
 
   if (!phoneNumber) {
     return res.status(400).json({ message: 'Phone number is required' });
   }
 
-  const query = 'SELECT id FROM users WHERE PhoneNumber LIKE ? AND UserType = ?';
-  pool.query(query, [`%${phoneNumber}%`, 'UserType'], (error, results) => {
+  if (!userID) {
+    return res.status(400).json({ message: 'User ID is required' });
+  }
+
+  const query = 'SELECT * FROM users WHERE PhoneNumber LIKE ? AND UserType = ? AND UserID != ?';
+  pool.query(query, [`%${phoneNumber}%`, 'User', userID], (error, results) => {
     if (error) {
       return res.status(500).json({ message: 'Database query failed', error });
     }
-    
+
     if (results.length > 0) {
-      return res.status(200).json(results); // Return only the IDs
+      return res.status(200).json(results);
     } else {
       return res.status(404).json({ message: 'No receivers found' });
     }
@@ -366,7 +369,7 @@ app.post('/api/orders', (req, res) => {
       return res.status(400).json({ message: 'All fields are required' });
   }
 
-  const query = 'INSERT INTO orders (Sender_ID, Recipient_ID, Recipient_Phone, Status) VALUES (?, ?, ?, ?)';
+  const query = 'INSERT INTO orders (Sender_ID, Recipient_ID, Recipient_Phone, Status) VALUES (?, ?, ?, 1)';
   pool.query(query, [Sender_ID, Recipient_ID, Recipient_Phone, Status], (err, results) => {
       if (err) {
           console.error('Error creating order:', err);
