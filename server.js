@@ -334,7 +334,7 @@ app.get('/api/products', (req, res) => {
 });
 
 
-//ค้นหาคนรับสินค้าจากหมายเลขโทรศัพ
+// ค้นหาคนรับสินค้าจากหมายเลขโทรศัพ
 app.get('/api/receivers', (req, res) => {
   const { phoneNumber } = req.query;
 
@@ -342,20 +342,20 @@ app.get('/api/receivers', (req, res) => {
     return res.status(400).json({ message: 'Phone number is required' });
   }
 
-  // Query to find receivers that match the phone number
-  const query = 'SELECT * FROM users WHERE PhoneNumber LIKE ?';
-  pool.query(query, [`%${phoneNumber}%`], (error, results) => {
+  const query = 'SELECT id FROM users WHERE PhoneNumber LIKE ? AND UserType = ?';
+  pool.query(query, [`%${phoneNumber}%`, 'UserType'], (error, results) => {
     if (error) {
       return res.status(500).json({ message: 'Database query failed', error });
     }
     
     if (results.length > 0) {
-      return res.status(200).json(results);
+      return res.status(200).json(results); // Return only the IDs
     } else {
       return res.status(404).json({ message: 'No receivers found' });
     }
   });
 });
+
 //-----------------------------------------------------------------------------------------------------------------
 // API สำหรับสร้างออเดอร์
 app.post('/api/orders', (req, res) => {
