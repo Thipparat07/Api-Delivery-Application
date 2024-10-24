@@ -363,15 +363,15 @@ app.get('/api/receivers', (req, res) => {
 // API สำหรับเพิ่มข้อมูลในตาราง orders และ list
 app.post('/createOrder', (req, res) => {
   const { Sender_ID, Recipient_ID, products } = req.body;
-  console.error(Sender_ID, Recipient_ID, Recipient_Phone, products);
+  console.error(Sender_ID, Recipient_ID, products);
   // ตรวจสอบว่ามีข้อมูลที่จำเป็นหรือไม่
   if (!Sender_ID || !Recipient_ID  || !products || products.length === 0) {
     return res.status(400).json({ message: 'กรุณาระบุข้อมูลให้ครบถ้วน' });
   }
 
   // สร้างคำสั่ง SQL เพื่อเก็บข้อมูลในตาราง orders
-  const orderQuery = `INSERT INTO orders (Sender_ID, Recipient_ID, Recipient_Phone, Status) VALUES (?, ?, ?, 1)`;
-  const orderValues = [Sender_ID, Recipient_ID, Recipient_Phone];
+  const orderQuery = `INSERT INTO orders (Sender_ID, Recipient_ID, Status) VALUES (?, ?, 1)`;
+  const orderValues = [Sender_ID, Recipient_ID];
 
   pool.query(orderQuery, orderValues, (err, result) => {
     if (err) {
